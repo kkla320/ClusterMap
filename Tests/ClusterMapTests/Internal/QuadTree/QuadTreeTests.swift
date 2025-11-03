@@ -7,33 +7,37 @@
 
 import Foundation
 import MapKit
-import XCTest
+import Testing
 @testable import ClusterMap
 
-final class QuadTreeTests: XCTestCase {
-    func test_add_pointInsideBoundary_returnsTrue() {
+@Suite
+struct QuadTreeTests {
+    @Test
+    func add_pointInsideBoundary_returnsTrue() {
         let point = StubAnnotation.insideMediumRect
         let quadTree = makeSUT(with: .mediumRect)
 
         let result = quadTree.add(point)
         let points = quadTree.findAnnotations(in: .mediumRect)
 
-        XCTAssertTrue(result)
-        XCTAssertTrue(points.contains(point))
+        #expect(result)
+        #expect(points.contains(point))
     }
 
-    func test_add_pointOutsideBoundary_returnsFalse() {
+    @Test
+    func add_pointOutsideBoundary_returnsFalse() {
         let point = StubAnnotation.outsideMediumRect
         let quadTree = makeSUT(with: .mediumRect)
 
         let result = quadTree.add(point)
         let points = quadTree.findAnnotations(in: .mediumRect)
 
-        XCTAssertFalse(result)
-        XCTAssertFalse(points.contains(point))
+        #expect(result == false)
+        #expect(!points.contains(point))
     }
 
-    func test_remove_pointInQuadTree_returnsTrue() {
+    @Test
+    func remove_pointInQuadTree_returnsTrue() {
         let point = StubAnnotation.insideMediumRect
         let quadTree = makeSUT(with: .mediumRect)
 
@@ -42,22 +46,44 @@ final class QuadTreeTests: XCTestCase {
         let result = quadTree.remove(point)
         let points = quadTree.findAnnotations(in: .mediumRect)
 
-        XCTAssertNotNil(result)
-        XCTAssertFalse(points.contains(point))
+        #expect(result != nil)
+        #expect(!points.contains(point))
     }
 
-    func test_remove_pointNotInQuadTree_returnsFalse() {
+    @Test
+    func remove_pointNotInQuadTree_returnsFalse() {
         let point = StubAnnotation.insideMediumRect
         let quadTree = makeSUT(with: .mediumRect)
 
         let result = quadTree.remove(point)
         let points = quadTree.findAnnotations(in: .mediumRect)
 
-        XCTAssertNil(result)
-        XCTAssertFalse(points.contains(point))
+        #expect(result == nil)
+        #expect(!points.contains(point))
+    }
+    
+    @Test
+    func removeAll_shouldRemoveAllAnnotationsWithMathingCondition() {
+        let point1 = StubAnnotation.insideMediumRect
+        let point2 = StubAnnotation.outsideMediumRect
+        let quadTree = makeSUT(with: .world)
+        
+        quadTree.add(point1)
+        quadTree.add(point2)
+        
+        let removedAnnotations = quadTree.removeAll { annotation in
+            return MKMapRect.mediumRect.contains(annotation.coordinate)
+        }
+        
+        let points = quadTree.findAnnotations(in: .world)
+
+        #expect(removedAnnotations.count == 1)
+        #expect(!points.contains(point1))
+        #expect(points.contains(point2))
     }
 
-    func test_pointsInRect_containingPointsInsideAndOutside_returnsPointsOnlyInsideSelectedRect() {
+    @Test
+    func pointsInRect_containingPointsInsideAndOutside_returnsPointsOnlyInsideSelectedRect() {
         let point1 = StubAnnotation.insideSmallRect
         let point2 = StubAnnotation.insideSmallRect
         let pointOutside = StubAnnotation.outsideSmallRect
@@ -69,16 +95,23 @@ final class QuadTreeTests: XCTestCase {
 
         let points = quadTree.findAnnotations(in: .smallRect)
 
-        XCTAssertTrue(points.contains(point1))
-        XCTAssertTrue(points.contains(point2))
-        XCTAssertFalse(points.contains(pointOutside), "\(pointOutside) \(points)")
+        #expect(points.contains(point1))
+        #expect(points.contains(point2))
+        #expect(!points.contains(pointOutside), "\(pointOutside) \(points)")
     }
-}
-
-private extension QuadTreeTests {
-    func makeSUT(with rect: MKMapRect = .world) -> QuadTree<StubAnnotation> {
-        let quadTree = QuadTree<StubAnnotation>(rect: rect)
-        trackForMemoryLeaks(quadTree)
-        return quadTree
+    
+    @Test
+    func checkMemoryLeak() {
+        weak var weakReference: QuadTree<StubAnnotation>?
+        var quadTree: QuadTree<StubAnnotation>? = makeSUT()
+        
+        weakReference = quadTree
+        #expect(quadTree != nil)
+        quadTree = nil
+        #expect(weakReference == nil)
+    }
+    
+    private func makeSUT(with rect: MKMapRect = .world) -> QuadTree<StubAnnotation> {
+        return QuadTree<StubAnnotation>(rect: rect)
     }
 }

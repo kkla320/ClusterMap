@@ -33,7 +33,6 @@ import MapKit
 /// ```
 public actor ClusterManager<Annotation: CoordinateIdentifiable>
     where
-    Annotation: Identifiable,
     Annotation: Hashable,
     Annotation: Sendable
 {

@@ -23,6 +23,11 @@ final class QuadTree<AnnotationType: CoordinateIdentifiable> where AnnotationTyp
     func remove(_ annotation: AnnotationType) -> AnnotationType? {
         root.remove(annotation)
     }
+    
+    @discardableResult
+    func removeAll(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
+        root.removeAll(where: condition)
+    }
 
     func findAnnotations(in targetRect: MKMapRect) -> [AnnotationType] {
         root.findAnnotations(in: targetRect)

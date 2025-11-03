@@ -54,7 +54,7 @@ final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: H
 
         return nil
     }
-
+    
     func findAnnotations(in targetRect: MKMapRect) -> [AnnotationType] {
         guard rect.intersects(targetRect) else {
             return []
@@ -77,6 +77,36 @@ final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: H
         }
 
         return foundAnnotations
+    }
+}
+
+// MARK: RemoveAll
+extension Node {
+    @discardableResult
+    func removeAll(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
+        var removedItems: [AnnotationType] = []
+        removedItems += removeAllAnnotationsFromChildren(where: condition)
+        removedItems += removeAllAnnotationFromCurrentNode(where: condition)
+        return removedItems
+    }
+    
+    private func removeAllAnnotationFromCurrentNode(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
+        let annotationsToRemove = annotations.filter(condition)
+        if annotationsToRemove.isEmpty {
+            return []
+        }
+        
+        return annotationsToRemove.compactMap { annotations.remove($0) }
+    }
+    
+    private func removeAllAnnotationsFromChildren(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
+        guard case let .internal(children) = type else {
+            return []
+        }
+        
+        return children.reduce(into: []) { result, child in
+            result += child.removeAll(where: condition)
+        }
     }
 }
 
