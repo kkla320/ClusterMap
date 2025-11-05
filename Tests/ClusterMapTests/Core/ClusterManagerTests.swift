@@ -102,9 +102,9 @@ final class ClusterManagerTests: XCTestCase {
 
 private extension ClusterManagerTests {
     func makeSUT(
-        with configuration: ClusterManager<StubAnnotation>.Configuration = .init()
-    ) -> ClusterManager<StubAnnotation> {
-        let manager = ClusterManager<StubAnnotation>(configuration: configuration)
+        with configuration: ClusterManager<[StubAnnotation]>.Configuration = .init()
+    ) -> ClusterManager<[StubAnnotation]> {
+        let manager = ClusterManager<[StubAnnotation]>(configuration: configuration, storage: [])
         trackForMemoryLeaks(manager)
         return manager
     }

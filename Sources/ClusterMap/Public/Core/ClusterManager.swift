@@ -31,73 +31,81 @@ import MapKit
 ///     // Handle the difference here
 /// }
 /// ```
-public actor ClusterManager<Annotation: CoordinateIdentifiable>
-    where
-    Annotation: Hashable,
-    Annotation: Sendable
-{
-    private var tree = QuadTree<Annotation>(rect: .world)
+public actor ClusterManager<Storage: NodeStorage> where Storage.Element: CoordinateIdentifiable & Hashable & Sendable {
+    public typealias Annotation = Storage.Element
+    
+    private var tree: QuadTree<Storage>
     private let configuration: Configuration
     private var zoomLevel: Double = 0
 
     /// Initializes a new ClusterManager instance.
     ///
     /// - Parameter configuration: The clustering configuration settings.
-    public init(configuration: Configuration = Configuration()) {
+    public init(
+        configuration: Configuration = Configuration(),
+        storage: Storage
+    ) {
         self.configuration = configuration
+        self.tree = QuadTree(rect: .world)
     }
 
     /// A collection of currently visible annotations on the map.
-    public private(set) var visibleAnnotations: [AnnotationType] = []
+    public private(set) var visibleAnnotations: [ClusterOrAnnotation<Annotation>] = []
 
     /// Adds a single annotation to the cluster manager.
     ///
     /// - Parameter annotation: The annotation to be added.
-    public func add(_ annotation: Annotation) {
+    public func add(_ annotation: Storage.Element) {
         tree.add(annotation)
     }
 
     /// Adds multiple annotations to the cluster manager.
     ///
     /// - Parameter annotations: An array of annotations to be added.
-    public func add<Annotations: Sequence>(_ annotations: Annotations) where Annotations.Element == Annotation {
+    public func add<Annotations: Sequence>(_ annotations: Annotations) where Annotations.Element == Storage.Element {
         annotations.forEach { tree.add($0) }
     }
 
     /// Removes a single annotation from the cluster manager.
     ///
     /// - Parameter annotation: The annotation to be removed.
-    public func remove(_ annotation: Annotation) {
+    public func remove(_ annotation: Storage.Element) {
         tree.remove(annotation)
     }
 
     /// Removes multiple annotations from the cluster manager.
     ///
     /// - Parameter annotations: An array of annotations to be removed.
-    public func remove<Annotations: Sequence>(_ annotations: Annotations) where Annotations.Element == Annotation {
+    public func remove<Annotations: Sequence>(_ annotations: Annotations) where Annotations.Element == Storage.Element {
         annotations.forEach { tree.remove($0) }
     }
 
+    /// Removes all annotations that match a certain condition
+    /// - Parameter condition: The condition which will be used to check wether the annotation will be removed
+    public func removeAll(where condition: (Storage.Element) -> Bool) {
+        tree.removeAll(where: condition)
+    }
+    
     /// Removes all annotations from the cluster manager.
     public func removeAll() {
-        tree = QuadTree<Annotation>(rect: .world)
+        tree = QuadTree<Storage>(rect: .world)
     }
 
     /// A collection of all annotations.
-    public func fetchAllAnnotations() -> [Annotation] {
+    public func fetchAllAnnotations() -> [Storage.Element] {
         tree.findAnnotations(in: .world)
     }
 
     /// A collection of currently visible nested annotations on the map.
     ///
     /// This includes individual annotations as well as annotations within visible clusters.
-    public func fetchVisibleNestedAnnotations() -> [Annotation] {
-        visibleAnnotations.reduce(into: [Annotation]()) { partialResult, annotationType in
+    public func fetchVisibleNestedAnnotations() -> [Storage.Element] {
+        visibleAnnotations.reduce(into: [Storage.Element]()) { partialResult, annotationType in
             switch annotationType {
             case .annotation(let annotation):
                 partialResult.append(annotation)
             case .cluster(let clusterAnnotation):
-                partialResult += clusterAnnotation.memberAnnotations
+                partialResult += clusterAnnotation.annotations
             }
         }
     }
@@ -148,9 +156,9 @@ private extension ClusterManager {
     }
 
     func determineAnnotationChanges(
-        allAnnotations: [AnnotationType],
+        allAnnotations: [ClusterOrAnnotation<Annotation>],
         visibleMapRect: MKMapRect
-    ) -> (toAdd: [AnnotationType], toRemove: [AnnotationType]) {
+    ) -> (toAdd: [ClusterOrAnnotation<Annotation>], toRemove: [ClusterOrAnnotation<Annotation>]) {
         let before = visibleAnnotations
         let after = allAnnotations
 
@@ -172,15 +180,18 @@ private extension ClusterManager {
         return (toAdd, toRemove)
     }
 
-    func applyVisibleAnnotationChanges(toAdd: [AnnotationType], toRemove: [AnnotationType]) {
+    func applyVisibleAnnotationChanges(
+        toAdd: [ClusterOrAnnotation<Annotation>],
+        toRemove: [ClusterOrAnnotation<Annotation>]
+    ) {
         visibleAnnotations.subtract(toRemove)
         visibleAnnotations.add(toAdd)
     }
 
-    func clusterAnnotations(within mapRects: [MKMapRect], zoomLevel: Double) -> [AnnotationType] {
-        var allAnnotations: [AnnotationType] = []
+    func clusterAnnotations(within mapRects: [MKMapRect], zoomLevel: Double) -> [ClusterOrAnnotation<Annotation>] {
+        var allAnnotations: [ClusterOrAnnotation<Annotation>] = []
         for mapRect in mapRects {
-            var annotations: [Annotation] = []
+            var annotations: [Storage.Element] = []
 
             for node in tree.findAnnotations(in: mapRect) {
                 if node.shouldCluster {
@@ -192,12 +203,12 @@ private extension ClusterManager {
 
             let count = annotations.count
             if count >= configuration.minCountForClustering, zoomLevel <= configuration.maxZoomLevel {
-                let cluster = ClusterAnnotation(
+                let cluster = ClusterOrAnnotation<Annotation>.Cluster(
                     coordinate: configuration.clusterPosition.calculatePosition(
                         for: annotations.map(\.coordinate),
                         within: mapRect
                     ),
-                    memberAnnotations: annotations
+                    annotations: annotations
                 )
                 allAnnotations.append(.cluster(cluster))
             } else {

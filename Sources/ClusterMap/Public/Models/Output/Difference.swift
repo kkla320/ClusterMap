@@ -11,9 +11,9 @@ public extension ClusterManager {
     /// Represents the differences between the current and new sets of annotations.
     struct Difference: Sendable {
         /// An array of  objects that should be inserted.
-        public var insertions: [AnnotationType] = []
+        public var insertions: [ClusterOrAnnotation<Annotation>] = []
 
         /// An array of  objects that should be removed.
-        public var removals: [AnnotationType] = []
+        public var removals: [ClusterOrAnnotation<Annotation>] = []
     }
 }

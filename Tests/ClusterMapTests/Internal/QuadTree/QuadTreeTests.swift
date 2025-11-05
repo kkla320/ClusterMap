@@ -37,6 +37,28 @@ struct QuadTreeTests {
     }
 
     @Test
+    func add_multiplePoints_shouldStoreAllOfThem() {
+        let points: [StubAnnotation] = (1...50).map { _ in StubAnnotation.insideWorld }
+        
+        let quadTree = makeSUT(with: .world)
+        
+        let addedPoints = quadTree.add(annotations: points)
+        
+        #expect(addedPoints.count == 50)
+    }
+    
+    @Test
+    func add_multiplePoints_shouldRespectStorage() {
+        let points: [StubAnnotation] = (1...50).map { _ in StubAnnotation.insideWorld }
+        
+        let quadTree = makeSUT(with: .world, storage: StubStorage())
+        
+        let addedPoints = quadTree.add(annotations: points)
+        
+        #expect(addedPoints.count == 0)
+    }
+    
+    @Test
     func remove_pointInQuadTree_returnsTrue() {
         let point = StubAnnotation.insideMediumRect
         let quadTree = makeSUT(with: .mediumRect)
@@ -102,8 +124,8 @@ struct QuadTreeTests {
     
     @Test
     func checkMemoryLeak() {
-        weak var weakReference: QuadTree<StubAnnotation>?
-        var quadTree: QuadTree<StubAnnotation>? = makeSUT()
+        weak var weakReference: QuadTree<[StubAnnotation]>?
+        var quadTree: QuadTree<[StubAnnotation]>? = makeSUT()
         
         weakReference = quadTree
         #expect(quadTree != nil)
@@ -111,7 +133,39 @@ struct QuadTreeTests {
         #expect(weakReference == nil)
     }
     
-    private func makeSUT(with rect: MKMapRect = .world) -> QuadTree<StubAnnotation> {
-        return QuadTree<StubAnnotation>(rect: rect)
+    private func makeSUT(with rect: MKMapRect = .world) -> QuadTree<[StubAnnotation]> {
+        return QuadTree<[StubAnnotation]>(rect: rect)
+    }
+    
+    private func makeSUT<Storage: NodeStorage>(with rect: MKMapRect = .world, storage: Storage) -> QuadTree<Storage> {
+        QuadTree<Storage>(rect: rect)
+    }
+}
+
+struct StubStorage: NodeStorage {
+    var count: Int {
+        0
+    }
+    
+    typealias Element = StubAnnotation
+
+    init(arrayLiteral elements: StubAnnotation...) {
+        
+    }
+    
+    func makeIterator() -> [StubAnnotation].Iterator {
+        [StubAnnotation]().makeIterator()
+    }
+    
+    mutating func add(_ element: StubAnnotation) -> Bool {
+        return false
+    }
+    
+    mutating func remove(_ element: StubAnnotation) -> StubAnnotation? {
+        return nil
+    }
+    
+    mutating func removeAll(where condition: (StubAnnotation) -> Bool) -> [StubAnnotation] {
+        return []
     }
 }

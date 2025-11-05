@@ -50,8 +50,8 @@ final class QuadTreePerformanceTests: XCTestCase {
 }
 
 private extension QuadTreePerformanceTests {
-    func makeSUT(with rect: MKMapRect = .world) -> QuadTree<StubAnnotation> {
-        let quadTree = QuadTree<StubAnnotation>(rect: rect)
+    func makeSUT(with rect: MKMapRect = .world) -> QuadTree<[StubAnnotation]> {
+        let quadTree = QuadTree<[StubAnnotation]>(rect: rect)
         return quadTree
     }
 }

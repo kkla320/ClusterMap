@@ -34,6 +34,10 @@ extension StubAnnotation {
     static var outsideMediumRect: StubAnnotation {
         pointInRandomLocation(outside: .mediumRect)
     }
+    
+    static var insideWorld: StubAnnotation {
+        pointInRandomLocation(inside: .world)
+    }
 
     private static func pointInRandomLocation(inside rect: MKMapRect) -> StubAnnotation {
         StubAnnotation(

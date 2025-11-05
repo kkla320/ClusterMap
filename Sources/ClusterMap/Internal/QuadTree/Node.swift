@@ -7,26 +7,33 @@
 
 import MapKit
 
-final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: Hashable {
+
+
+final class Node<Storage: NodeStorage> where Storage.Element: CoordinateIdentifiable & Hashable {
+    typealias Annotation = Storage.Element
+    
     let maxPointCapacity = 8
     let rect: MKMapRect
 
-    var annotations: [AnnotationType] = []
+    var annotations: Storage
     var type: `Type` = .leaf
 
     init(rect: MKMapRect) {
         self.rect = rect
+        self.annotations = []
     }
 
     @discardableResult
-    func add(_ targetAnnotation: AnnotationType) -> Bool {
+    func add(_ targetAnnotation: Annotation) -> Bool {
         guard isAnnotationWithinRect(targetAnnotation) else {
             return false
         }
 
         switch type {
         case .leaf:
-            annotations.append(targetAnnotation)
+            guard annotations.add(targetAnnotation) else {
+                return false
+            }
             if annotations.count >= maxPointCapacity {
                 subdivide()
             }
@@ -37,9 +44,9 @@ final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: H
         }
         return true
     }
-
+    
     @discardableResult
-    func remove(_ targetAnnotation: AnnotationType) -> AnnotationType? {
+    func remove(_ targetAnnotation: Annotation) -> Annotation? {
         guard isAnnotationWithinRect(targetAnnotation) else {
             return nil
         }
@@ -55,12 +62,12 @@ final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: H
         return nil
     }
     
-    func findAnnotations(in targetRect: MKMapRect) -> [AnnotationType] {
+    func findAnnotations(in targetRect: MKMapRect) -> [Annotation] {
         guard rect.intersects(targetRect) else {
             return []
         }
 
-        var foundAnnotations: [AnnotationType] = []
+        var foundAnnotations: [Annotation] = []
         foundAnnotations.reserveCapacity(annotations.count)
 
         for annotation in annotations where targetRect.contains(annotation.coordinate) {
@@ -82,24 +89,55 @@ final class Node<AnnotationType: CoordinateIdentifiable> where AnnotationType: H
 
 // MARK: RemoveAll
 extension Node {
+    func add<Annotations: Sequence>(annotations: Annotations) -> [Annotation] where Annotations.Element == Annotation {
+        let annotationsInRectangle = annotations.filter { isAnnotationWithinRect($0) }
+        if annotationsInRectangle.isEmpty {
+            return []
+        }
+        
+        switch type {
+        case .leaf:
+            var addedAnnotations: [Annotation] = []
+            for annotation in annotationsInRectangle {
+                guard self.annotations.add(annotation) else {
+                    continue
+                }
+                addedAnnotations.append(annotation)
+                guard self.annotations.count >= maxPointCapacity else {
+                    continue
+                }
+                subdivide()
+                break
+            }
+            let remainingAnnotations = annotationsInRectangle.filter { !addedAnnotations.contains($0) }
+            guard remainingAnnotations.count < annotationsInRectangle.count else {
+                return addedAnnotations
+            }
+            addedAnnotations.append(
+                contentsOf: self.add(annotations: remainingAnnotations)
+            )
+            return addedAnnotations
+        case .internal(let children):
+            return children
+                .flatMap { node in
+                    node.add(annotations: annotations)
+                }
+        }
+    }
+    
     @discardableResult
-    func removeAll(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
-        var removedItems: [AnnotationType] = []
+    func removeAll(where condition: (Annotation) -> Bool) -> [Annotation] {
+        var removedItems: [Annotation] = []
         removedItems += removeAllAnnotationsFromChildren(where: condition)
         removedItems += removeAllAnnotationFromCurrentNode(where: condition)
         return removedItems
     }
     
-    private func removeAllAnnotationFromCurrentNode(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
-        let annotationsToRemove = annotations.filter(condition)
-        if annotationsToRemove.isEmpty {
-            return []
-        }
-        
-        return annotationsToRemove.compactMap { annotations.remove($0) }
+    private func removeAllAnnotationFromCurrentNode(where condition: (Annotation) -> Bool) -> [Annotation] {
+        return annotations.removeAll(where: condition)
     }
     
-    private func removeAllAnnotationsFromChildren(where condition: (AnnotationType) -> Bool) -> [AnnotationType] {
+    private func removeAllAnnotationsFromChildren(where condition: (Annotation) -> Bool) -> [Annotation] {
         guard case let .internal(children) = type else {
             return []
         }
@@ -111,18 +149,15 @@ extension Node {
 }
 
 extension Node {
-    private func isAnnotationWithinRect(_ targetAnnotation: AnnotationType) -> Bool {
+    private func isAnnotationWithinRect(_ targetAnnotation: Annotation) -> Bool {
         rect.contains(targetAnnotation.coordinate)
     }
 
-    private func removeAnnotationFromCurrentNode(_ targetAnnotation: AnnotationType) -> AnnotationType? {
-        if let indexOfPoint = annotations.firstIndex(where: { $0 == targetAnnotation }) {
-            return annotations.remove(at: indexOfPoint)
-        }
-        return nil
+    private func removeAnnotationFromCurrentNode(_ targetAnnotation: Annotation) -> Annotation? {
+        return annotations.remove(targetAnnotation)
     }
 
-    private func removeAnnotationFromChildren(_ targetAnnotation: AnnotationType) -> AnnotationType? {
+    private func removeAnnotationFromChildren(_ targetAnnotation: Annotation) -> Annotation? {
         switch type {
         case .internal(let children):
             for child in children {
