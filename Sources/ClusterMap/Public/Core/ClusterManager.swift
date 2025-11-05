@@ -42,8 +42,7 @@ public actor ClusterManager<Storage: NodeStorage> where Storage.Element: Coordin
     ///
     /// - Parameter configuration: The clustering configuration settings.
     public init(
-        configuration: Configuration = Configuration(),
-        storage: Storage
+        configuration: Configuration = Configuration()
     ) {
         self.configuration = configuration
         self.tree = QuadTree(rect: .world)
