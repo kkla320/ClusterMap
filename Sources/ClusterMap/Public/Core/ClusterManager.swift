@@ -39,7 +39,6 @@ public actor ClusterManager<Annotation: CoordinateIdentifiable>
 {
     private var tree = QuadTree<Annotation>(rect: .world)
     private let configuration: Configuration
-    private var zoomLevel: Double = 0
 
     /// Initializes a new ClusterManager instance.
     ///
@@ -103,6 +102,25 @@ public actor ClusterManager<Annotation: CoordinateIdentifiable>
         }
     }
 
+    /// Reloads the annotations on the map based on the current map scale.
+    ///
+    /// - Parameters:
+    ///   - mapScale: The scale of the map view.
+    ///   - coordinateRegion: The visible coordinate region on the map.
+    /// - Returns: A `Difference` object which contains the changes made during the reload.
+    @discardableResult
+    public func reload(
+        mapScale: MapScale,
+        coordinateRegion: MKCoordinateRegion
+    ) async -> Difference {
+        let visibleMapRect = MKMapRect(region: coordinateRegion)
+        let changes = performAnnotationClustering(
+            mapScale: mapScale,
+            visibleMapRect: visibleMapRect
+        )
+        return changes
+    }
+    
     /// Reloads the annotations on the map based on the current zoom level and visible map region.
     /// This is an async-await variant of the `reload(mapViewSize:coordinateRegion:completion:)` method.
     ///
@@ -111,33 +129,38 @@ public actor ClusterManager<Annotation: CoordinateIdentifiable>
     ///   - coordinateRegion: The visible coordinate region on the map.
     /// - Returns: A `Difference` object which contains the changes made during the reload.
     @discardableResult
-    public func reload(mapViewSize: CGSize, coordinateRegion: MKCoordinateRegion) async -> Difference {
+    public func reload(
+        mapViewSize: CGSize,
+        coordinateRegion: MKCoordinateRegion
+    ) async -> Difference {
         let visibleMapRect = MKMapRect(region: coordinateRegion)
         let visibleMapRectWidth = visibleMapRect.size.width
-        let zoomScale = Double(mapViewSize.width) / visibleMapRectWidth
-        let changes = performAnnotationClustering(zoomScale: zoomScale, visibleMapRect: visibleMapRect)
+        let changes = performAnnotationClustering(
+            mapScale: MapScale(
+                mapViewWidthInPoints: mapViewSize.width,
+                visibleWidthInMapPoints: visibleMapRectWidth
+            ),
+            visibleMapRect: visibleMapRect
+        )
         return changes
-    }
-
-    /// Reloads the annotations on the map based on the current zoom level and visible map region.
-    ///
-    /// - Parameters:
-    ///   - mkMapView: The map view.
-    /// - Returns: A `Difference` object which contains the changes made during the reload.
-    public func reload(mkMapView: MKMapView) async {
-        await reload(mapViewSize: mkMapView.bounds.size, coordinateRegion: mkMapView.region)
     }
 }
 
 private extension ClusterManager {
-    func performAnnotationClustering(zoomScale: Double, visibleMapRect: MKMapRect) -> Difference {
-        let mapRects = divideMapIntoGridCells(for: zoomScale, visibleMapRect: visibleMapRect)
+    func performAnnotationClustering(
+        mapScale: MapScale,
+        visibleMapRect: MKMapRect
+    ) -> Difference {
+        let mapRects = divideMapIntoGridCells(
+            for: mapScale,
+            visibleMapRect: visibleMapRect
+        )
 
         if configuration.shouldDistributeAnnotationsOnSameCoordinate {
             adjustOverlappingAnnotations(within: visibleMapRect)
         }
 
-        let allAnnotations = clusterAnnotations(within: mapRects, zoomLevel: zoomLevel)
+        let allAnnotations = clusterAnnotations(within: mapRects, zoomLevel: mapScale.zoomLevel)
         let (toAdd, toRemove) = determineAnnotationChanges(
             allAnnotations: allAnnotations,
             visibleMapRect: visibleMapRect
@@ -178,7 +201,7 @@ private extension ClusterManager {
         visibleAnnotations.add(toAdd)
     }
 
-    func clusterAnnotations(within mapRects: [MKMapRect], zoomLevel: Double) -> [AnnotationType] {
+    func clusterAnnotations(within mapRects: [MKMapRect], zoomLevel: Int) -> [AnnotationType] {
         var allAnnotations: [AnnotationType] = []
         for mapRect in mapRects {
             var annotations: [Annotation] = []
@@ -226,12 +249,19 @@ private extension ClusterManager {
         }
     }
 
-    func divideMapIntoGridCells(for zoomScale: Double, visibleMapRect: MKMapRect) -> [MKMapRect] {
-        guard !zoomScale.isInfinite, !zoomScale.isNaN else { return [] }
+    func divideMapIntoGridCells(for mapScale: MapScale, visibleMapRect: MKMapRect) -> [MKMapRect] {
+        guard mapScale.isValid else {
+            return []
+        }
 
-        zoomLevel = zoomScale.zoomLevel
-        let scaleFactor = zoomScale / configuration.cellSizeForZoomLevel(Int(zoomLevel)).width
+        let zoomLevel = mapScale.zoomLevel
+        let scaleFactor = mapScale.rawValue / configuration.cellSizeForZoomLevel(Int(zoomLevel)).width
 
+        let cellWidth = configuration.cellSizeForZoomLevel(zoomLevel).width * mapScale.rawValue
+        
+        let verticalCellCount = Int(ceil(visibleMapRect.width / cellWidth))
+        let horizontalCellCount = Int(ceil(visibleMapRect.height / cellWidth))
+        
         let minX = Int(floor(visibleMapRect.minX * scaleFactor))
         let maxX = Int(floor(visibleMapRect.maxX * scaleFactor))
         let minY = Int(floor(visibleMapRect.minY * scaleFactor))

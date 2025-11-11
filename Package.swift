@@ -6,7 +6,8 @@ import PackageDescription
 let package = Package(
     name: "ClusterMap",
     platforms: [
-        .iOS(.v13), .macOS(.v11),
+        .iOS(.v13),
+        .macOS(.v11),
     ],
     products: [
         .library(name: "ClusterMap", targets: ["ClusterMap"]),
@@ -18,7 +19,12 @@ let package = Package(
     targets: [
         .target(name: "ClusterMap"),
         .testTarget(name: "ClusterMapTests", dependencies: ["ClusterMap"]),
-        .target(name: "ClusterMapSwiftUI"),
+        .target(
+            name: "ClusterMapSwiftUI",
+            dependencies: [
+                "ClusterMap"
+            ]
+        ),
     ]
 )
 

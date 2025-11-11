@@ -29,7 +29,7 @@ public extension ClusterManager {
         /// Beyond this zoom level, annotations will be displayed individually.
         ///
         /// - Note: The minimum value is `0` (max zoom out). The default is `20`.
-        public let maxZoomLevel: Double
+        public let maxZoomLevel: Int
 
         /// Threshold number for clustering within a region.
         ///
@@ -130,7 +130,7 @@ public extension ClusterManager {
         public let cellSizeForZoomLevel: @Sendable (Int) -> CGSize
 
         public init(
-            maxZoomLevel: Double = 20,
+            maxZoomLevel: Int = 20,
             minCountForClustering: Int = 2,
             shouldRemoveInvisibleAnnotations: Bool = true,
             shouldDistributeAnnotationsOnSameCoordinate: Bool = true,
