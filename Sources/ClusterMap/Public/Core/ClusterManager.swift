@@ -255,13 +255,8 @@ private extension ClusterManager {
         }
 
         let zoomLevel = mapScale.zoomLevel
-        let scaleFactor = mapScale.rawValue / configuration.cellSizeForZoomLevel(Int(zoomLevel)).width
+        let scaleFactor = mapScale.rawValue / configuration.cellSizeForZoomLevel(zoomLevel).width
 
-        let cellWidth = configuration.cellSizeForZoomLevel(zoomLevel).width * mapScale.rawValue
-        
-        let verticalCellCount = Int(ceil(visibleMapRect.width / cellWidth))
-        let horizontalCellCount = Int(ceil(visibleMapRect.height / cellWidth))
-        
         let minX = Int(floor(visibleMapRect.minX * scaleFactor))
         let maxX = Int(floor(visibleMapRect.maxX * scaleFactor))
         let minY = Int(floor(visibleMapRect.minY * scaleFactor))
