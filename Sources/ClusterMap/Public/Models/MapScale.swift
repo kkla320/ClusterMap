@@ -15,7 +15,7 @@ public struct MapScale: RawRepresentable, Sendable, Equatable, Hashable {
         rawValue.isFinite && !rawValue.isNaN
     }
     
-    public var zoomLevel: Int {
+    var zoomLevel: Int {
         let maxZoomLevel = log2(MKMapSize.world.width / 256)
         let zoomLevel = floor(log2(rawValue) + 0.5) // negative
         return Int(max(0, maxZoomLevel + zoomLevel)) // max - current
